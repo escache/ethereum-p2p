@@ -1,20 +1,28 @@
 {
   "name": "nexeth",
-  "version": "1.0.0",
-  "description": "A TypeScript implementation of an Ethereum P2P network protocol",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "version": "1.0.0-bridgenet-m1",
+  "description": "Nexeth bridgenet — cross-chain testnet with CLI and operator portal",
+  "main": "dist/bridgenet/orchestrator/start.js",
+  "types": "dist/bridgenet/orchestrator/start.d.ts",
+  "bin": {
+    "nexeth": "dist/cli/bin/nexeth.js"
+  },
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "ts-node index.ts",
+    "build": "tsc -p tsconfig.bridgenet.json",
+    "build:legacy": "tsc",
+    "start": "node dist/bridgenet/orchestrator/start.js",
+    "bridgenet": "TS_NODE_PROJECT=tsconfig.bridgenet.json VERBOSE=1 ts-node bridgenet/orchestrator/start.ts",
+    "demo:bridge": "TS_NODE_PROJECT=tsconfig.bridgenet.json ts-node bridgenet/orchestrator/demo.ts",
+    "demo:live": "TS_NODE_PROJECT=tsconfig.bridgenet.json ts-node bridgenet/orchestrator/live-demo.ts",
+    "nexeth": "TS_NODE_PROJECT=tsconfig.bridgenet.json ts-node cli/bin/nexeth.ts",
+    "dev": "TS_NODE_PROJECT=tsconfig.bridgenet.json ts-node bridgenet/orchestrator/start.ts",
     "test": "jest",
-    "lint": "eslint . --ext .ts",
-    "format": "prettier --write \"**/*.ts\"",
+    "test:bridgenet": "jest bridgenet",
+    "lint": "eslint bridgenet cli --ext .ts",
+    "format": "prettier --write \"bridgenet/**/*.ts\" \"cli/**/*.ts\"",
     "clean": "rimraf dist",
-    "prepare": "npm run build",
-    "check-types": "tsc --noEmit",
-    "validate": "npm run lint && npm run check-types"
+    "check-types": "tsc -p tsconfig.bridgenet.json --noEmit",
+    "validate": "npm run check-types && npm run test:bridgenet"
   },
   "keywords": [
     "ethereum",
@@ -27,10 +35,12 @@
   "license": "MIT",
   "dependencies": {
     "crc": "^4.3.2",
-    "events": "^3.3.0"
+    "events": "^3.3.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/crc": "^3.8.0",
+    "@types/ws": "^8.5.13",
     "@types/jest": "^29.5.0",
     "@types/node": "^18.15.11",
     "@typescript-eslint/eslint-plugin": "^5.57.1",
