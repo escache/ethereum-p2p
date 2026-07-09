@@ -22,6 +22,8 @@ export interface BlockHeader {
     gasLimit: bigint;
     gasUsed: bigint;
     extraData: Buffer;
+    nonce?: Buffer;
+    hash?: string;
 }
 
 export interface BlockBody {
@@ -42,6 +44,7 @@ export interface Transaction {
     v: number;
     r: string;
     s: string;
+    gasUsed?: bigint;
 }
 
 export interface TransactionReceipt {
@@ -68,6 +71,13 @@ export interface Log {
 }
 
 // State Related Types
+export interface AccountState {
+    nonce: number;
+    balance: bigint;
+    codeHash: string;
+    storageRoot: string;
+}
+
 export interface StateDB {
     getRoot(): string;
     setRoot(root: string): Promise<void>;
@@ -77,21 +87,40 @@ export interface StateDB {
     commit(): Promise<void>;
     checkpoint(): void;
     revert(): void;
+    getAccountState(address: string): Promise<AccountState>;
+    getCode(address: string): Promise<Buffer | null>;
+    setAccountState(address: string, state: AccountState): Promise<void>;
+    setStorageAt(address: string, key: Buffer, value: Buffer): Promise<void>;
 }
 
 export interface ExecutionResult {
     gasUsed: bigint;
     status: boolean;
     logs: Log[];
+    returnData?: Buffer;
+}
+
+export interface ExecutionContext {
+    blockNumber: number;
+    blockGasLimit: bigint;
+    coinbase: string;
+    timestamp: number;
+    gasPrice: bigint;
+    difficulty: bigint;
 }
 
 // Metrics Related Types
 export interface ConsensusMetrics {
-    blockTime: number;
-    blockSize: number;
-    transactionCount: number;
-    uncleCount: number;
-    difficulty: bigint;
+    blockTime?: number;
+    blockSize?: number;
+    transactionCount?: number;
+    uncleCount?: number;
+    difficulty?: bigint;
+    activeValidators?: number;
+    participation?: number;
+    finalityDelay?: number;
+    lastBlockTime?: number;
+    forkCount?: number;
 }
 
 export interface LatencyMetrics {
@@ -182,4 +211,9 @@ export interface ForkDetectionResult {
     isFork: boolean;
     commonAncestor?: BlockData;
     forkBlocks: BlockData[];
+}
+
+export interface BlockStorage {
+    storeBlock(block: BlockData): Promise<void>;
+    getBlock(hash: string): Promise<BlockData | null>;
 } 

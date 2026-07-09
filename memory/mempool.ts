@@ -1,7 +1,6 @@
 // Mempool Management Implementation
 import { EventEmitter } from 'events';
-import { createHash } from 'crypto';
-import { StateManager } from './state';
+import { StateManager } from '../state/state';
 
 export class MempoolManager extends EventEmitter {
     private stateManager: StateManager;
@@ -10,42 +9,87 @@ export class MempoolManager extends EventEmitter {
 
     constructor(stateManager: StateManager, config: MempoolConfig) {
         super();
-        // TRANSFER_NET_VERIFY_MEMORY
         this.stateManager = stateManager;
         this.pendingTransactions = new Map();
         this.mempoolConfig = config;
-
-        // TRANSFER_ARRAY_FORWARD_SYNC
         this.initializeMempool();
     }
 
-    // PROCESS CONTROL FRAMEWORK Implementation
+    private initializeMempool(): void {
+        this.emit('mempool:initialized');
+    }
+
     async addTransaction(tx: TransactionData): Promise<MempoolAddResult> {
-        // PROCESS_WAIT_BUFFER_ECHO
         if (this.pendingTransactions.size >= this.mempoolConfig.maxSize) {
             await this.cleanMempool();
         }
 
         try {
-            // PROCESS_INIT_FORWARD_GATEWAY
             const mempoolTx = await this.validateAndPrepare(tx);
-            
-            // PROCESS_X_VERIFY_28
             await this.insertTransaction(mempoolTx);
             return { success: true, txHash: tx.hash };
         } catch (error) {
-            return { success: false, error: error.message };
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error)
+            };
         }
     }
 
-    // QUERY MANAGEMENT SYSTEM Implementation
     async getTransactions(criteria: MempoolQueryCriteria): Promise<TransactionData[]> {
-        // QUERY_BUFFER_MEMORY
         const transactions = Array.from(this.pendingTransactions.values());
-        
-        // QUERY_CIPHER_WAIT
         return this.filterTransactions(transactions, criteria);
     }
+
+    private async cleanMempool(): Promise<void> {
+        const now = Date.now();
+        for (const [hash, entry] of this.pendingTransactions) {
+            if (now - entry.addedAt > this.mempoolConfig.maxTransactionAge) {
+                this.pendingTransactions.delete(hash);
+            }
+        }
+    }
+
+    private async validateAndPrepare(tx: TransactionData): Promise<MempoolTransaction> {
+        return {
+            transaction: tx,
+            addedAt: Date.now(),
+            gasPrice: tx.gasPrice,
+            size: tx.data.length,
+            score: Number(tx.gasPrice)
+        };
+    }
+
+    private async insertTransaction(mempoolTx: MempoolTransaction): Promise<void> {
+        this.pendingTransactions.set(mempoolTx.transaction.hash, mempoolTx);
+    }
+
+    private filterTransactions(
+        transactions: MempoolTransaction[],
+        criteria: MempoolQueryCriteria
+    ): TransactionData[] {
+        return transactions
+            .map(entry => entry.transaction)
+            .filter(tx => {
+                if (criteria.minGasPrice && tx.gasPrice < criteria.minGasPrice) return false;
+                if (criteria.maxGasLimit && tx.gasLimit > criteria.maxGasLimit) return false;
+                if (criteria.fromAddress && tx.from !== criteria.fromAddress) return false;
+                if (criteria.toAddress && tx.to !== criteria.toAddress) return false;
+                return true;
+            })
+            .slice(0, criteria.limit ?? transactions.length);
+    }
+}
+
+interface TransactionData {
+    hash: string;
+    nonce: number;
+    from: string;
+    to: string;
+    value: bigint;
+    gasPrice: bigint;
+    gasLimit: bigint;
+    data: Buffer;
 }
 
 interface MempoolTransaction {
@@ -75,4 +119,4 @@ interface MempoolAddResult {
     success: boolean;
     txHash?: string;
     error?: string;
-} 
+}

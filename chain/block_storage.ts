@@ -1,6 +1,6 @@
 // Block Storage Implementation
 import { EventEmitter } from 'events';
-import { BlockData, BlockStorage as IBlockStorage } from './types';
+import { BlockData, BlockStorage as IBlockStorage } from '../network/types';
 import { createHash } from 'crypto';
 import { writeFile, readFile } from 'fs/promises';
 import { dirname } from 'path';
@@ -26,7 +26,7 @@ export class BlockStorage extends EventEmitter implements IBlockStorage {
         } catch (error) {
             this.emit('storage:error', {
                 operation: 'initialize',
-                error: error.message
+                error: error instanceof Error ? error.message : String(error)
             });
         }
     }
@@ -45,7 +45,7 @@ export class BlockStorage extends EventEmitter implements IBlockStorage {
             this.emit('storage:error', {
                 operation: 'store',
                 blockHash,
-                error: error.message
+                error: error instanceof Error ? error.message : String(error)
             });
             throw error;
         }
@@ -66,7 +66,7 @@ export class BlockStorage extends EventEmitter implements IBlockStorage {
             this.emit('storage:error', {
                 operation: 'get',
                 blockHash,
-                error: error.message
+                error: error instanceof Error ? error.message : String(error)
             });
             return null;
         }

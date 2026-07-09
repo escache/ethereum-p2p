@@ -40,7 +40,7 @@ export class TransactionPool extends EventEmitter {
             return { success: true, txHash: tx.hash };
         } catch (error) {
             this.emit('transaction:failed', tx.hash, error);
-            return { success: false, error: error.message };
+            return { success: false, error: error instanceof Error ? error.message : String(error) };
         }
     }
 
@@ -308,7 +308,7 @@ interface TransactionPoolConfig {
     transactionTimeout: number;
 }
 
-interface PoolTransaction {
+export interface PoolTransaction {
     transaction: Transaction;
     addedAt: number;
     gasPrice: bigint;

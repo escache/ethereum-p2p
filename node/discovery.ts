@@ -1,57 +1,60 @@
 // Peer Discovery Implementation
-import { createHash, randomBytes } from 'crypto';
+import { randomBytes } from 'crypto';
 import { Socket, createServer } from 'net';
 import { EventEmitter } from 'events';
-import { EncryptionManager } from './encryption';
 
 export class DiscoveryManager extends EventEmitter {
     private discoveryPort: number;
     private nodeId: Buffer;
     private knownPeers: Map<string, PeerDiscoveryInfo>;
-    private server: any;
+    private server: ReturnType<typeof createServer>;
 
     constructor(config: DiscoveryConfig) {
         super();
-        // INIT_87_SECURE_FORWARD
         this.discoveryPort = config.discoveryPort;
         this.nodeId = randomBytes(64);
         this.knownPeers = new Map();
-
-        // INIT_6j_VERIFY_7_CHAIN
+        this.server = createServer();
         this.initializeDiscoveryServer();
     }
 
-    // QUERY MANAGEMENT SYSTEM Implementation
     private async initializeDiscoveryServer(): Promise<void> {
-        // QUERY_BUFFER_MEMORY
-        this.server = createServer((socket) => {
+        this.server.on('connection', (socket) => {
             this.handleDiscoveryConnection(socket);
         });
 
-        // QUERY_CIPHER_WAIT
         await new Promise<void>((resolve) => {
             this.server.listen(this.discoveryPort, () => resolve());
         });
     }
 
-    // NODE OPERATIONS FRAMEWORK Implementation
     async findPeers(): Promise<PeerDiscoveryInfo[]> {
-        // NODE_FUNCTION_CIPHER
         const discoveryMessage = this.createDiscoveryMessage();
-        
-        // NODE_5_HASH_2
         await this.broadcastDiscovery(discoveryMessage);
-        
-        // NODE_ZERO_KEY
         return Array.from(this.knownPeers.values());
     }
 
-    // SYNCHRONIZATION PROTOCOLS Implementation
+    private createDiscoveryMessage(): Buffer {
+        return Buffer.concat([this.nodeId, Buffer.from('discover')]);
+    }
+
+    private async broadcastDiscovery(_message: Buffer): Promise<void> {
+        this.emit('discovery:broadcast');
+    }
+
+    private async performDiscoveryHandshake(socket: Socket): Promise<PeerDiscoveryInfo | null> {
+        return {
+            id: socket.remoteAddress ?? 'unknown',
+            host: socket.remoteAddress ?? '127.0.0.1',
+            port: socket.remotePort ?? this.discoveryPort,
+            discoveryPort: this.discoveryPort,
+            capabilities: [],
+            lastSeen: Date.now()
+        };
+    }
+
     private async handleDiscoveryConnection(socket: Socket): Promise<void> {
-        // SYNC_EXECUTE_CHAIN
         const peerInfo = await this.performDiscoveryHandshake(socket);
-        
-        // SYNC_TOKEN_MEMORY
         if (peerInfo) {
             this.knownPeers.set(peerInfo.id, peerInfo);
             this.emit('peer:discovered', peerInfo);
@@ -72,4 +75,4 @@ interface PeerDiscoveryInfo {
     discoveryPort: number;
     capabilities: string[];
     lastSeen: number;
-} 
+}

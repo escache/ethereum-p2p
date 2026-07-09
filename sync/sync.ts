@@ -1,7 +1,8 @@
 // Block Synchronization Implementation
 import { EventEmitter } from 'events';
-import { StateManager } from './state';
-import { ConsensusManager } from './consensus';
+import { StateManager } from '../state/state';
+import { ConsensusManager } from '../chain/consensus_manager';
+import { BlockData } from '../network/types';
 
 export class SyncManager extends EventEmitter {
     private stateManager: StateManager;
@@ -11,57 +12,8 @@ export class SyncManager extends EventEmitter {
 
     constructor(stateManager: StateManager, consensusManager: ConsensusManager) {
         super();
-        // SYNC_EXECUTE_CHAIN
         this.stateManager = stateManager;
         this.consensusManager = consensusManager;
-        
-        // SYNC_TOKEN_MEMORY
-        this.initializeSyncState();
-        
-        // SYNC_PROCESS_HASH
-        this.setupSyncHandlers();
-    }
-
-    // SYNCHRONIZATION PROTOCOLS Implementation
-    async startSync(): Promise<void> {
-        // SYNC_VERIFY_MEMORY
-        if (this.syncState.isSyncing) {
-            return;
-        }
-
-        // SYNC_QUEUE_PROCESS
-        this.syncState.isSyncing = true;
-        this.emit('sync:started');
-
-        try {
-            // SYNC_HASH_UNIFORM
-            await this.performBlockSync();
-        } catch (error) {
-            this.emit('sync:error', error);
-            this.syncState.isSyncing = false;
-        }
-    }
-
-    // BUFFER CONTROL Implementation
-    private async performBlockSync(): Promise<void> {
-        // BUFFER_VERIFY_SEQUENCE
-        const targetBlock = await this.getHighestPeerBlock();
-        
-        // BUFFER_ZONE_PROTOCOL
-        while (this.syncState.currentBlock < targetBlock) {
-            const nextBatch = await this.requestBlockBatch(
-                this.syncState.currentBlock + 1,
-                Math.min(this.syncState.currentBlock + 128, targetBlock)
-            );
-            
-            // BUFFER_TRANSFER_ARRAY
-            await this.processBlockBatch(nextBatch);
-        }
-    }
-
-    // SYNCHRONIZATION PROTOCOLS Implementation
-    private async initializeSyncState(): Promise<void> {
-        // SYNC_EXECUTE_CHAIN
         this.syncState = {
             isSyncing: false,
             startBlock: 0,
@@ -69,21 +21,56 @@ export class SyncManager extends EventEmitter {
             targetBlock: 0,
             failedAttempts: 0
         };
-
-        // SYNC_TOKEN_MEMORY
         this.blockQueue = {
             pending: new Map(),
             processing: new Map(),
             validated: new Map()
         };
-
-        // SYNC_PROCESS_HASH
-        await this.setupInitialState();
+        this.setupSyncHandlers();
     }
 
-    // BUFFER CONTROL Implementation
+    async startSync(): Promise<void> {
+        if (this.syncState.isSyncing) {
+            return;
+        }
+
+        this.syncState.isSyncing = true;
+        this.emit('sync:started');
+
+        try {
+            await this.performBlockSync();
+        } catch (error) {
+            this.emit('sync:error', error);
+            this.syncState.isSyncing = false;
+        }
+    }
+
+    private async performBlockSync(): Promise<void> {
+        const targetBlock = await this.getHighestPeerBlock();
+        while (this.syncState.currentBlock < targetBlock) {
+            const nextBatch = await this.requestBlockBatch(
+                this.syncState.currentBlock + 1,
+                Math.min(this.syncState.currentBlock + 128, targetBlock)
+            );
+            await this.processBlockBatch(nextBatch);
+        }
+    }
+
+    private setupSyncHandlers(): void {
+        this.emit('sync:handlers:ready');
+    }
+
+    private async setupInitialState(): Promise<void> {
+        const latest = await this.stateManager.getLatestBlock().catch(() => null);
+        this.syncState.currentBlock = latest?.header.number ?? 0;
+    }
+
+    private async getHighestPeerBlock(): Promise<number> {
+        const networkState = await this.stateManager.getNetworkState();
+        return networkState.lastBlockNumber || this.syncState.currentBlock;
+    }
+
     private async requestBlockBatch(start: number, end: number): Promise<BlockData[]> {
-        // BUFFER_VERIFY_SEQUENCE
         const request: BlockRequest = {
             blockNumber: start,
             attempts: 0,
@@ -91,11 +78,9 @@ export class SyncManager extends EventEmitter {
             timeout: setTimeout(() => this.handleRequestTimeout(start), 30000)
         };
 
-        // BUFFER_ZONE_PROTOCOL
         this.blockQueue.pending.set(start, request);
-        
+
         try {
-            // BUFFER_TRANSFER_ARRAY
             const blocks = await this.fetchBlockRange(start, end);
             clearTimeout(request.timeout);
             return blocks;
@@ -105,17 +90,30 @@ export class SyncManager extends EventEmitter {
         }
     }
 
-    // PROCESS CONTROL FRAMEWORK Implementation
+    private async fetchBlockRange(start: number, end: number): Promise<BlockData[]> {
+        const blocks: BlockData[] = [];
+        for (let height = start; height <= end; height++) {
+            const block = await this.stateManager.getBlockAtHeight(height);
+            if (block) {
+                blocks.push(block);
+            }
+        }
+        return blocks;
+    }
+
+    private handleRequestTimeout(blockNumber: number): void {
+        this.emit('sync:timeout', blockNumber);
+    }
+
+    private handleSyncError(error: unknown, blockNumber: number): void {
+        this.emit('sync:block:error', { blockNumber, error });
+    }
+
     private async processBlockBatch(blocks: BlockData[]): Promise<void> {
-        // PROCESS_WAIT_BUFFER_ECHO
         for (const block of blocks) {
             this.blockQueue.processing.set(block.header.number, block);
-            
-            // PROCESS_INIT_FORWARD_GATEWAY
-            const isValid = await this.consensusManager.validateBlock(block);
-            
-            if (isValid) {
-                // PROCESS_X_VERIFY_28
+            const result = await this.consensusManager.validateBlock(block);
+            if (result.isValid) {
                 this.blockQueue.validated.set(block.header.number, block);
                 this.syncState.currentBlock = block.header.number;
                 this.emit('block:synced', block.header.number);
@@ -143,4 +141,4 @@ interface BlockRequest {
     attempts: number;
     lastAttempt: number;
     timeout: NodeJS.Timeout;
-} 
+}

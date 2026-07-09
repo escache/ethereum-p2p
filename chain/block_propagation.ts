@@ -1,7 +1,7 @@
 // Block Propagation Implementation
 import { EventEmitter } from 'events';
 import { StateManager } from '../state/state';
-import { ConsensusManager } from './consensus';
+import { ConsensusManager } from './consensus_manager';
 import { NetworkManager, Peer } from '../network/network';
 import { 
     BlockData,
@@ -179,7 +179,7 @@ export class BlockPropagationManager extends EventEmitter {
             this.emit('block:propagated', block.hash);
         } catch (error) {
             propagationState.status = 'failed';
-            propagationState.error = error;
+            propagationState.error = error instanceof Error ? error : new Error(String(error));
             this.emit('block:propagation:failed', block.hash, error);
         }
     }
@@ -208,7 +208,8 @@ export class BlockPropagationManager extends EventEmitter {
         }
 
         const validationBlock = this.convertBlockDataForNetwork(block);
-        return this.consensusManager.validateBlock(validationBlock);
+        const result = await this.consensusManager.validateBlock(validationBlock);
+        return result.isValid;
     }
 
     // Handle received blocks
@@ -272,7 +273,7 @@ export class BlockPropagationManager extends EventEmitter {
             } catch (error) {
                 this.emit('propagation:validation:error', {
                     blockHash,
-                    error: error.message
+                    error: error instanceof Error ? error.message : String(error)
                 });
             }
         }
@@ -348,10 +349,10 @@ export class BlockPropagationManager extends EventEmitter {
     }
 
     private classifyError(error: Error): LocalPropagationErrorType {
-        if (error.message.includes('timeout')) return 'timeout';
-        if (error.message.includes('validation')) return 'validation';
-        if (error.message.includes('network')) return 'network';
-        return 'unknown';
+        if (error.message.includes('timeout')) return 'propagation_timeout';
+        if (error.message.includes('validation')) return 'validation_failed';
+        if (error.message.includes('network')) return 'network_error';
+        return 'invalid_format';
     }
 
     // Add cleanupStaleEntries method
@@ -398,7 +399,7 @@ export class BlockPropagationManager extends EventEmitter {
                 this.emit('propagation:peer:failed', {
                     peerId: peer.id,
                     blockHash: block.hash,
-                    error: error.message
+                    error: error instanceof Error ? error.message : String(error)
                 });
             }
         }
@@ -637,13 +638,13 @@ export class BlockPropagationManager extends EventEmitter {
             const propagationState = this.propagationCache.get(blockHash);
             if (propagationState && !propagationState.receivedBy.has(peerId)) {
                 try {
-                    await this.networkManager.sendBlock(peerId, propagationState.block);
+                    await this.networkManager.sendBlock(peerId, this.convertBlockDataForNetwork(propagationState.block));
                     propagationState.receivedBy.add(peerId);
                 } catch (error) {
                     this.emit('peer:sync:failed', {
                         peerId,
                         blockHash,
-                        error: error.message
+                        error: error instanceof Error ? error.message : String(error)
                     });
                 }
             }
