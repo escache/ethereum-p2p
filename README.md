@@ -1,172 +1,88 @@
-# Nexeth P2P Network Implementation
+# Nexeth Bridgenet
 
-A TypeScript implementation of an Ethereum P2P network protocol with advanced networking, consensus, and state management capabilities.
+A local cross-chain testnet where deposits on **Chain A** mint on **Chain B**, with a relayer, `nexeth` CLI, and operator portal.
 
-## Project Structure
+> Plain blockchain skeleton → **bridgenet product**: CLI + API + portal, not mainnet sync.
 
-The project is organized into the following main components:
+## Quick start (5 minutes)
 
-```
-nexeth/
-├── access/           # Access control and permissions
-├── chain/            # Chain management and consensus
-│   ├── block_finalizer.ts
-│   ├── block_propagation.ts
-│   ├── block_storage.ts
-│   ├── chain_manager.ts
-│   ├── consensus_manager.ts
-│   └── consensus.ts
-├── data/            # Transaction handling and metrics
-│   ├── metrics.ts
-│   ├── transaction_executor.ts
-│   ├── transaction_persistence.ts
-│   ├── transaction_pool.ts
-│   └── transactions.ts
-├── memory/          # Memory management and mempool
-│   ├── memory_architecture.ts
-│   └── mempool.ts
-├── network/         # Network protocols and message handling
-│   ├── handlers.ts
-│   ├── messages.ts
-│   ├── network_optimizer.ts
-│   ├── network_protocol.ts
-│   ├── network.ts
-│   ├── protocol.ts
-│   ├── protocol_types.ts
-│   └── types.ts
-├── node/           # Peer discovery and management
-│   ├── discovery.ts
-│   └── peer_manager.ts
-├── security/       # Security and encryption
-│   ├── encryption.ts
-│   ├── security_matrix.ts
-│   └── security.ts
-├── state/          # State management
-│   └── state.ts
-├── sync/           # Synchronization and finality
-│   ├── finality_tracker.ts
-│   └── sync.ts
-└── verification/   # Block and transaction validation
-    ├── block_validator.ts
-    ├── transaction_validator.ts
-    └── validation_rules.ts
-
-## Features
-
-- **Advanced P2P Networking**
-  - Efficient message handling with compression support
-  - Robust peer discovery and management
-  - Network optimization and metrics collection
-
-- **Blockchain Management**
-  - Block validation and propagation
-  - Transaction processing and persistence
-  - Chain reorganization handling
-  - Fork detection and resolution
-
-- **Security**
-  - Message encryption and integrity verification
-  - Peer scoring and ban management
-  - Access control matrix
-
-- **State Management**
-  - Efficient state tracking and updates
-  - Finality tracking
-  - Block and transaction validation
-
-- **Memory Management**
-  - Memory-efficient data structures
-  - Transaction mempool management
-  - Caching and optimization
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js (v14 or higher)
-- TypeScript (v4.5 or higher)
-- npm or yarn
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/accessor-io/ethereum-p2p.git
-cd nexeth
-```
-
-2. Install dependencies:
 ```bash
 npm install
+npm run bridgenet          # API + relayer + portal on :3847
 ```
 
-3. Build the project:
+In another terminal:
+
 ```bash
-npm run build
+npm run demo:bridge        # deposit → mint demo (LOCKED → RELAYING → MINTED)
+npm run nexeth -- doctor   # health check
+npm run nexeth -- bridge demo
+npm run nexeth -- portal open
 ```
 
-### Usage
-
-The project provides a modular architecture that can be integrated into various Ethereum-compatible applications. Here's a basic example:
-
-```typescript
-import { NetworkManager } from './network/network';
-import { StateManager } from './state/state';
-import { PeerManager } from './node/peer_manager';
-
-// Initialize core components
-const stateManager = new StateManager();
-const networkManager = new NetworkManager(stateManager);
-const peerManager = new PeerManager(stateManager, networkManager);
-
-// Start the network
-networkManager.start().then(() => {
-    console.log('Network started successfully');
-});
-```
+Open the portal: **http://127.0.0.1:3847**
 
 ## Architecture
 
-The project follows a modular architecture based on the following frameworks:
+```
+nexeth CLI  →  Bridgenet API (:3847)  →  Operator Portal
+                    ↓
+              Relayer watches Chain A Locked events
+                    ↓
+              Mints on Chain B (app-chain)
+```
 
-1. **Initialization Framework**
-   - Bootstrap protocol
-   - Primary/Secondary/Tertiary initialization
+| Component | Path | Role |
+|-----------|------|------|
+| Chain A | `bridgenet/chain-a/` | Simulated lock chain (Anvil-ready for M2) |
+| Chain B | `bridgenet/chain-b/` | Nexeth app-chain ledger |
+| Relayer | `bridgenet/relayer/` | `Locked` → `mint` with messageId dedup |
+| API | `bridgenet/api/` | REST + WebSocket live feed |
+| CLI | `cli/` | `nexeth doctor`, `bridge demo`, `portal open` |
+| Portal | `portal/public/` | Dark ops dashboard |
+| Contracts | `bridgenet/contracts/` | Solidity reference (LockBridge, MintBridge) |
 
-2. **Security Matrix**
-   - Encryption layer
-   - Key management
-   - Hash functions
+**Security model (M1):** trusted relayer
 
-3. **Memory Architecture**
-   - Buffer control
-   - Memory optimization
-   - Resource management
+## CLI commands
 
-4. **Network Protocols**
-   - Message handling
-   - Peer management
-   - Protocol versioning
+```
+nexeth init                 # ~/.nexeth/config.yaml
+nexeth doctor               # API, chains, relayer health
+nexeth bridge demo          # Run deposit → mint
+nexeth bridge messages      # List transfers
+nexeth portal open          # Open operator portal
+```
 
-5. **Process Control Framework**
-   - State management
-   - Event handling
-   - Resource allocation
+Add `--json` for CI/portal integration.
 
-## Contributing
+## API
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Stack health |
+| `GET /api/messages` | All bridge messages |
+| `GET /api/messages/:id` | Single message + timeline |
+| `POST /api/demo/lock` | Trigger demo deposit |
+| `WS /ws` | Live message feed |
+
+## Legacy node skeleton
+
+The original P2P/consensus modules (`chain/`, `network/`, etc.) remain as a learning skeleton. They are **not** required for bridgenet and are excluded from the default build (`tsconfig.bridgenet.json`).
+
+## Docs
+
+- [Bridgenet prompt layout](docs/BRIDGENET_PROMPT_LAYOUT.md) — master spec for CLI, portal, and milestones
+
+## Milestones
+
+| M | Status |
+|---|--------|
+| M1 — A→B demo, CLI, portal | ✓ |
+| M2 — Message persistence, Anvil Chain A | planned |
+| M3 — Client updates, idempotent restart | planned |
+| M4 — Chaos mode, demo wizard polish | planned |
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Ethereum P2P Network Protocol
-- TypeScript Community
-- Open Source Contributors 
+MIT

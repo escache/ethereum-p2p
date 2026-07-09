@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nexeth Bridgenet — Operator Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="logo">
+        <span class="logo-mark">⬡</span>
+        <span class="logo-text">nexeth</span>
+        <span class="logo-sub">bridgenet</span>
+      </div>
+      <nav>
+        <a href="/" class="nav-item active" data-page="dashboard">Dashboard</a>
+        <a href="/messages" class="nav-item" data-page="messages">Messages</a>
+        <a href="/demo" class="nav-item" data-page="demo">Demo</a>
+        <a href="/chains" class="nav-item" data-page="chains">Chains</a>
+        <a href="/settings" class="nav-item" data-page="settings">Settings</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div id="security-badge" class="security-badge">trusted-relayer</div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <h1 id="page-title">Dashboard</h1>
+        <div class="topbar-actions">
+          <span id="ws-status" class="status-pill pending">connecting</span>
+          <button id="btn-demo" class="btn btn-primary">Run Bridge Demo</button>
+        </div>
+      </header>
+
+      <!-- Dashboard -->
+      <section id="page-dashboard" class="page active">
+        <div class="grid stats">
+          <div class="card stat">
+            <div class="stat-label">Chain A height</div>
+            <div class="stat-value" id="stat-chain-a">—</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">Chain B height</div>
+            <div class="stat-value" id="stat-chain-b">—</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">Messages</div>
+            <div class="stat-value" id="stat-messages">0</div>
+          </div>
+          <div class="card stat">
+            <div class="stat-label">Relayer</div>
+            <div class="stat-value" id="stat-relayer">—</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Live Transfer Feed</h2>
+          </div>
+          <div id="live-feed" class="live-feed">
+            <div class="empty">Waiting for bridge activity…</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Messages -->
+      <section id="page-messages" class="page">
+        <div class="card">
+          <table class="message-table">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Message ID</th>
+                <th>Amount</th>
+                <th>Recipient</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody id="messages-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Demo -->
+      <section id="page-demo" class="page">
+        <div class="card demo-wizard">
+          <h2>Bridge Demo Wizard</h2>
+          <p class="muted">Deposit on Chain A → relayer → mint on Chain B</p>
+          <ol class="demo-steps">
+            <li id="step-lock" class="demo-step">Lock on Chain A</li>
+            <li id="step-relay" class="demo-step">Relayer picks up</li>
+            <li id="step-mint" class="demo-step">Mint on Chain B</li>
+          </ol>
+          <div id="demo-result" class="demo-result"></div>
+          <button id="btn-demo-wizard" class="btn btn-primary">Start Demo Transfer</button>
+        </div>
+      </section>
+
+      <!-- Chains -->
+      <section id="page-chains" class="page">
+        <div class="grid two-col">
+          <div class="card" id="chain-a-card">
+            <h2>Chain A</h2>
+            <pre id="chain-a-detail" class="mono-detail">loading…</pre>
+          </div>
+          <div class="card" id="chain-b-card">
+            <h2>Chain B</h2>
+            <pre id="chain-b-detail" class="mono-detail">loading…</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section id="page-settings" class="page">
+        <div class="card">
+          <h2>Settings</h2>
+          <dl class="settings-list">
+            <dt>API URL</dt><dd id="setting-api">—</dd>
+            <dt>Security model</dt><dd id="setting-security">—</dd>
+            <dt>Chain A type</dt><dd>simulated</dd>
+            <dt>Chain B chainId</dt><dd>424242</dd>
+          </dl>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
