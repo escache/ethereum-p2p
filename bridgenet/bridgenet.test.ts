@@ -2,9 +2,11 @@ import { SimulatedChainA } from './chain-a/simulated-chain';
 import { AppChainB } from './chain-b/app-chain';
 import { BridgeRelayer } from './relayer/relayer';
 
-const RELAYER_ID = '0xRelayer00000000000000000000000000000001';
-const SENDER = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
-const RECIPIENT = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
+import { ACCOUNTS } from './shared/accounts';
+
+const RELAYER_ID = ACCOUNTS.relayer.address;
+const SENDER = ACCOUNTS.alice.address;
+const RECIPIENT = ACCOUNTS.bob.address;
 
 describe('Bridgenet M1', () => {
   it('relays lock on Chain A to mint on Chain B', async () => {

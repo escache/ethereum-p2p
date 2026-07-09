@@ -86,6 +86,37 @@ export function createBridgenetServer(options: ApiServerOptions): http.Server {
       return;
     }
 
+    if (pathname === '/api/lock' && req.method === 'POST') {
+      let body = '';
+      req.on('data', (chunk) => (body += chunk));
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body || '{}');
+          const sender = parsed.sender;
+          const recipient = parsed.recipient ?? parsed.recipientOnB;
+          const amount = BigInt(parsed.amount ?? '0');
+
+          if (!sender || !recipient) throw new Error('sender and recipient required');
+          if (amount <= 0n) throw new Error('amount required');
+
+          const result = chainA.lock(sender, recipient, amount);
+          json(res, {
+            messageId: result.messageId,
+            txHash: result.txHash,
+            blockNumber: result.blockNumber,
+            blockHash: result.blockHash,
+            receipt: result.receipt,
+            amount: amount.toString(),
+            sender,
+            recipient,
+          });
+        } catch (err) {
+          json(res, { error: err instanceof Error ? err.message : String(err) }, 400);
+        }
+      });
+      return;
+    }
+
     if (pathname === '/api/demo/lock' && req.method === 'POST') {
       let body = '';
       req.on('data', (chunk) => (body += chunk));
@@ -158,6 +189,10 @@ function serializeMessage(msg: {
   status: string;
   chainATxHash: string;
   chainBTxHash?: string;
+  chainABlock?: object;
+  chainBBlock?: object;
+  chainAReceipt?: object;
+  chainBReceipt?: object;
   createdAt: number;
   updatedAt: number;
   error?: string;

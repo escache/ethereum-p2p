@@ -3,10 +3,11 @@ import { SimulatedChainA } from '../chain-a/simulated-chain';
 import { AppChainB } from '../chain-b/app-chain';
 import { BridgeRelayer } from '../relayer/relayer';
 import { createBridgenetServer } from '../api/server';
+import { ACCOUNTS } from '../shared/accounts';
 
-export const RELAYER_ID = '0xRelayer00000000000000000000000000000001';
-export const DEMO_SENDER = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
-export const DEMO_RECIPIENT = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
+export const RELAYER_ID = ACCOUNTS.relayer.address;
+export const DEMO_SENDER = ACCOUNTS.alice.address;
+export const DEMO_RECIPIENT = ACCOUNTS.bob.address;
 export const DEFAULT_PORT = 3847;
 
 export interface BridgenetStack {
@@ -26,6 +27,7 @@ export function startBridgenet(port = DEFAULT_PORT): BridgenetStack {
     confirmations: 1,
     pollIntervalMs: 300,
     securityModel: 'trusted-relayer',
+    verbose: process.env.VERBOSE === '1' || process.env.VERBOSE === 'true',
   });
 
   // Seed demo accounts

@@ -3,17 +3,20 @@ import { buildTrustedProof } from '../shared/message-id';
 import type { BridgeMessage, LockedEvent, SecurityModel } from '../shared/types';
 import type { SimulatedChainA } from '../chain-a/simulated-chain';
 import type { AppChainB } from '../chain-b/app-chain';
+import { logGethInfo, logTxReceipt } from '../shared/verbose';
 
 export interface RelayerConfig {
   confirmations: number;
   pollIntervalMs: number;
   securityModel: SecurityModel;
+  verbose: boolean;
 }
 
 const DEFAULT_CONFIG: RelayerConfig = {
   confirmations: 1,
   pollIntervalMs: 500,
   securityModel: 'trusted-relayer',
+  verbose: process.env.VERBOSE === '1' || process.env.VERBOSE === 'true',
 };
 
 /**
@@ -45,6 +48,7 @@ export class BridgeRelayer extends EventEmitter {
 
   start(): void {
     this.running = true;
+    this.vlog('relayer', 'Started — watching Chain A for Locked events');
     this.emit('started');
   }
 
@@ -81,14 +85,26 @@ export class BridgeRelayer extends EventEmitter {
       amount: event.amount,
       status: 'pending',
       chainATxHash: event.txHash,
+      chainABlock: this.chainA.getBlock(event.blockNumber),
+      chainAReceipt: event.receipt,
       createdAt: now,
       updatedAt: now,
-      timeline: [{ status: 'locked', at: now, detail: `Block ${event.blockNumber}` }],
+      timeline: [
+        {
+          status: 'locked',
+          at: now,
+          detail: `Chain A block #${event.blockNumber} tx=${event.txHash}`,
+        },
+      ],
     };
 
     this.messages.set(event.messageId, message);
     this.emit('message:created', message);
-    console.log(`[relayer] LOCKED  messageId=${event.messageId.slice(0, 18)}… amount=${event.amount}`);
+
+    console.log(`[relayer] LOCKED  messageId=${event.messageId}`);
+    console.log(`          from=${event.sender} to=${event.recipientOnB} amount=${event.amount} wei`);
+    console.log(`          chainA tx=${event.txHash} block=#${event.blockNumber}`);
+    if (this.config.verbose) logTxReceipt(event.receipt);
 
     this.pendingQueue.push(event);
     void this.processQueue();
@@ -107,13 +123,13 @@ export class BridgeRelayer extends EventEmitter {
     const message = this.messages.get(event.messageId);
     if (!message) return;
 
-    // Wait confirmations (simulated delay)
     if (this.config.confirmations > 0) {
+      this.vlog('relayer', `Waiting ${this.config.confirmations} confirmation(s) on Chain A…`);
       await sleep(this.config.pollIntervalMs * this.config.confirmations);
     }
 
-    this.updateMessage(event.messageId, 'relaying', 'Submitting mint to Chain B');
-    console.log(`[relayer] RELAYING messageId=${event.messageId.slice(0, 18)}…`);
+    this.updateMessage(event.messageId, 'relaying', 'Building proof and submitting mint to Chain B');
+    console.log(`[relayer] RELAYING messageId=${event.messageId}`);
 
     const proof = buildTrustedProof(event.messageId, this.chainB.relayerId);
     const result = this.chainB.mint(
@@ -126,15 +142,25 @@ export class BridgeRelayer extends EventEmitter {
 
     if (!result.success) {
       this.updateMessage(event.messageId, 'failed', result.error);
-      console.log(`[relayer] FAILED  messageId=${event.messageId.slice(0, 18)}… error=${result.error}`);
+      console.log(`[relayer] FAILED  messageId=${event.messageId} error=${result.error}`);
       this.emit('message:updated', this.messages.get(event.messageId));
       return;
     }
 
     const updated = this.messages.get(event.messageId)!;
     updated.chainBTxHash = result.txHash;
-    this.updateMessage(event.messageId, 'minted', `Minted on block ${this.chainB.getHealth().blockHeight}`);
-    console.log(`[relayer] MINTED  messageId=${event.messageId.slice(0, 18)}… tx=${result.txHash?.slice(0, 18)}…`);
+    updated.chainBBlock = result.blockNumber ? this.chainB.getBlock(result.blockNumber) : undefined;
+    updated.chainBReceipt = result.receipt;
+    this.updateMessage(
+      event.messageId,
+      'minted',
+      `Chain B block #${result.blockNumber} tx=${result.txHash}`
+    );
+
+    console.log(`[relayer] MINTED  messageId=${event.messageId}`);
+    console.log(`          chainB tx=${result.txHash} block=#${result.blockNumber}`);
+    if (this.config.verbose && result.receipt) logTxReceipt(result.receipt);
+
     this.emit('message:updated', this.messages.get(event.messageId));
   }
 
@@ -150,6 +176,10 @@ export class BridgeRelayer extends EventEmitter {
     message.updatedAt = Date.now();
     if (detail) message.error = status === 'failed' ? detail : undefined;
     message.timeline.push({ status, at: message.updatedAt, detail });
+  }
+
+  private vlog(tag: string, msg: string): void {
+    if (this.config.verbose) logGethInfo(tag, msg);
   }
 }
 

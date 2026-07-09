@@ -1,3 +1,5 @@
+import type { BlockHeader, TxReceipt } from './tx-types';
+
 export type BridgeMessageStatus = 'pending' | 'relaying' | 'minted' | 'failed';
 
 export type SecurityModel = 'trusted-relayer' | 'multisig' | 'optimistic' | 'light-client';
@@ -10,6 +12,10 @@ export interface BridgeMessage {
   status: BridgeMessageStatus;
   chainATxHash: string;
   chainBTxHash?: string;
+  chainABlock?: BlockHeader;
+  chainBBlock?: BlockHeader;
+  chainAReceipt?: TxReceipt;
+  chainBReceipt?: TxReceipt;
   createdAt: number;
   updatedAt: number;
   error?: string;
@@ -30,11 +36,26 @@ export interface LockedEvent {
   txHash: string;
   logIndex: number;
   blockNumber: number;
+  blockHash: string;
+  receipt: TxReceipt;
+}
+
+export interface MintedEvent {
+  messageId: string;
+  recipient: string;
+  amount: bigint;
+  txHash: string;
+  blockNumber: number;
+  blockHash: string;
+  receipt: TxReceipt;
 }
 
 export interface MintResult {
   success: boolean;
   txHash?: string;
+  blockNumber?: number;
+  blockHash?: string;
+  receipt?: TxReceipt;
   error?: string;
 }
 
