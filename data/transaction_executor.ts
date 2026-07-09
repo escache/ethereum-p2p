@@ -1,7 +1,6 @@
 // Transaction Execution Implementation
 import { EventEmitter } from 'events';
-import { Transaction } from './network';
-import { StateDB, ExecutionResult, Log } from './types';
+import { Transaction, StateDB, ExecutionResult, Log, AccountState, ExecutionContext } from '../network/types';
 import { EVM } from './evm';
 
 export class TransactionExecutor extends EventEmitter {
@@ -121,7 +120,7 @@ export class TransactionExecutor extends EventEmitter {
         
         // Handle gas refund
         const gasRefund = tx.gasLimit - result.gasUsed;
-        if (gasRefund > 0) {
+        if (gasRefund > 0n) {
             await this.refundGas(tx.from, gasRefund * tx.gasPrice);
         }
     }
@@ -282,14 +281,6 @@ export class TransactionExecutor extends EventEmitter {
             this.emit('execution:metrics', metrics);
         }
     }
-}
-
-interface ExecutionContext {
-    blockNumber: number;
-    timestamp: number;
-    gasPrice: bigint;
-    coinbase: string;
-    difficulty: bigint;
 }
 
 interface PreExecutionState {

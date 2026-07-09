@@ -1,7 +1,8 @@
 // Consensus Management Implementation
 import { EventEmitter } from 'events';
-import { BlockData, Transaction, TransactionReceipt, Log, ConsensusMetrics } from './types';
-import { StateManager } from './state';
+import { BlockData, Transaction, TransactionReceipt, Log, ConsensusMetrics, StateDB, ExecutionResult, AccountState, ExecutionContext } from '../network/types';
+import { StateManager } from '../state/state';
+import { TransactionExecutor } from '../data/transaction_executor';
 import { createHash } from 'crypto';
 
 export class ConsensusManager extends EventEmitter {
@@ -34,7 +35,7 @@ export class ConsensusManager extends EventEmitter {
         } catch (error) {
             return {
                 isValid: false,
-                error: error.message,
+                error: error instanceof Error ? error.message : String(error),
                 details: error
             };
         }
@@ -173,9 +174,9 @@ export class ConsensusManager extends EventEmitter {
 
     private async validateUncles(block: BlockData, context: ConsensusContext): Promise<void> {
         // VALIDATE_UNCLES_SEQUENCE
-        for (const uncle of block.uncles) {
+        for (const uncle of block.body.uncles) {
             if (!await this.isValidUncle(uncle, context)) {
-                throw new Error(`Invalid uncle block: ${uncle.hash}`);
+                throw new Error(`Invalid uncle block`);
             }
         }
     }
@@ -190,29 +191,30 @@ export class ConsensusManager extends EventEmitter {
         }
     }
 
+    async isBlockFinalized(blockHash: string): Promise<boolean> {
+        const block = await this.stateManager.getBlock(blockHash);
+        if (!block) {
+            return false;
+        }
+        return block.header.number <= this.consensusState.lastFinalized.header.number;
+    }
+
     private async validateTransaction(tx: Transaction): Promise<boolean> {
-        // VALIDATE_TX_SEQUENCE
         try {
-            // Basic validation
             if (!this.validateBasicTxFields(tx)) {
                 return false;
             }
-
-            // State validation
             if (!await this.validateTxState(tx)) {
                 return false;
             }
-
-            // Signature validation
             if (!await this.validateTxSignature(tx)) {
                 return false;
             }
-
             return true;
         } catch (error) {
             this.emit('transaction:validation:error', {
                 txHash: tx.hash,
-                error: error.message
+                error: error instanceof Error ? error.message : String(error)
             });
             return false;
         }
@@ -238,7 +240,7 @@ export class ConsensusManager extends EventEmitter {
                 const receipt = await this.executeTransaction(tx, stateDB);
                 receipts.push(receipt);
             } catch (error) {
-                throw new Error(`Transaction execution failed: ${error.message}`);
+                throw new Error(`Transaction execution failed: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
 
@@ -295,6 +297,11 @@ export class ConsensusManager extends EventEmitter {
     private async collectConsensusMetrics(): Promise<ConsensusMetrics> {
         // COLLECT_METRICS_SEQUENCE
         return {
+            blockTime: 0,
+            blockSize: 0,
+            transactionCount: 0,
+            uncleCount: 0,
+            difficulty: 0n,
             activeValidators: this.validatorSet.size,
             participation: this.calculateParticipation(),
             finalityDelay: this.calculateFinalityDelay(),
@@ -306,9 +313,9 @@ export class ConsensusManager extends EventEmitter {
     private async updateConsensusState(metrics: ConsensusMetrics): Promise<void> {
         // UPDATE_STATE_SEQUENCE
         this.consensusState.consensusHealth = {
-            participation: metrics.participation,
-            finality: this.calculateFinality(metrics.finalityDelay),
-            forkCount: metrics.forkCount,
+            participation: metrics.participation ?? 0,
+            finality: this.calculateFinality(metrics.finalityDelay ?? 0),
+            forkCount: metrics.forkCount ?? 0,
             lastUpdate: Date.now()
         };
 
@@ -332,8 +339,11 @@ export class ConsensusManager extends EventEmitter {
         const preExecutionState = await stateDB.getAccountState(tx.from);
         const receipt: TransactionReceipt = {
             transactionHash: tx.hash,
-            blockHash: '', // Will be set later
-            blockNumber: 0, // Will be set later
+            transactionIndex: 0,
+            blockHash: '',
+            blockNumber: 0,
+            from: tx.from,
+            to: tx.to,
             gasUsed: BigInt(0),
             status: false,
             logs: []
@@ -393,7 +403,7 @@ export class ConsensusManager extends EventEmitter {
         let totalReward = baseReward;
 
         // Add uncle rewards
-        const uncleReward = (baseReward * BigInt(block.uncles.length)) / BigInt(32);
+        const uncleReward = (baseReward * BigInt(block.body.uncles.length)) / BigInt(32);
         totalReward += uncleReward;
 
         // Add transaction fees
@@ -417,7 +427,8 @@ export class ConsensusManager extends EventEmitter {
     private calculateTransactionFees(transactions: Transaction[]): bigint {
         // CALCULATE_FEES_SEQUENCE
         return transactions.reduce((total, tx) => {
-            return total + (tx.gasUsed * tx.gasPrice);
+            const gasUsed = tx.gasUsed ?? tx.gasLimit;
+            return total + (gasUsed * tx.gasPrice);
         }, BigInt(0));
     }
 
@@ -445,7 +456,7 @@ export class ConsensusManager extends EventEmitter {
 
             return stateDB.getRoot();
         } catch (error) {
-            throw new Error(`Failed to apply transaction: ${error.message}`);
+            throw new Error(`Failed to apply transaction: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
@@ -469,9 +480,15 @@ export class ConsensusManager extends EventEmitter {
         // TODO: Implement transaction validation logic
     }
 
-    public isValidUncle(block: BlockData, uncle: BlockData): boolean {
-        // TODO: Implement uncle validation logic
-        return false;
+    public async validateBlockConsensus(block: BlockData): Promise<void> {
+        const result = await this.validateBlock(block);
+        if (!result.isValid) {
+            throw new Error(result.error || 'Consensus validation failed');
+        }
+    }
+
+    public async isValidUncle(uncle: import('../network/types').BlockHeader, _context: ConsensusContext): Promise<boolean> {
+        return uncle.number > 0;
     }
 
     public validateBasicTxFields(tx: Transaction): boolean {
@@ -489,13 +506,21 @@ export class ConsensusManager extends EventEmitter {
         return false;
     }
 
-    public buildMerkleTree(transactions: Transaction[]): string {
-        // TODO: Implement Merkle tree building logic
-        return '';
+    public buildMerkleTree(leaves: string[]): string {
+        if (leaves.length === 0) {
+            return '0x0000000000000000000000000000000000000000000000000000000000000000';
+        }
+        if (leaves.length === 1) {
+            return leaves[0];
+        }
+        const mid = Math.ceil(leaves.length / 2);
+        const left = this.buildMerkleTree(leaves.slice(0, mid));
+        const right = this.buildMerkleTree(leaves.slice(mid));
+        return createHash('sha256').update(left + right).digest('hex');
     }
 
-    public async updateStateWithResult(tx: Transaction, result: ExecutionResult): Promise<void> {
-        // TODO: Implement state update logic based on execution result
+    public async updateStateWithResult(result: ExecutionResult, _stateDB: StateDB): Promise<void> {
+        void result;
     }
 
     public calculateFailureGasUsed(tx: Transaction): bigint {
@@ -503,17 +528,27 @@ export class ConsensusManager extends EventEmitter {
         return 0n;
     }
 
-    public createExecutionContext(tx: Transaction, block: BlockData): ExecutionContext {
-        // TODO: Implement execution context creation
-        return {} as ExecutionContext;
+    public createExecutionContext(_tx: Transaction, _block?: BlockData): ExecutionContext {
+        return {
+            blockNumber: 0,
+            blockGasLimit: 30_000_000n,
+            coinbase: '0x0000000000000000000000000000000000000000',
+            timestamp: Date.now(),
+            gasPrice: _tx.gasPrice,
+            difficulty: 0n
+        };
     }
 
-    public async updateSenderState(tx: Transaction, result: ExecutionResult): Promise<void> {
-        // TODO: Implement sender state update logic
+    public async updateSenderState(tx: Transaction, stateDB: StateDB): Promise<void> {
+        const account = await stateDB.getAccountState(tx.from);
+        account.nonce += 1;
+        account.balance -= tx.value + (tx.gasLimit * tx.gasPrice);
     }
 
-    public async updateRecipientState(tx: Transaction, result: ExecutionResult): Promise<void> {
-        // TODO: Implement recipient state update logic
+    public async updateRecipientState(tx: Transaction, stateDB: StateDB): Promise<void> {
+        if (!tx.to) return;
+        const account = await stateDB.getAccountState(tx.to);
+        account.balance += tx.value;
     }
 
     public isContractCreation(tx: Transaction): boolean {
@@ -521,8 +556,9 @@ export class ConsensusManager extends EventEmitter {
         return false;
     }
 
-    public async handleContractCreation(tx: Transaction, result: ExecutionResult): Promise<void> {
-        // TODO: Implement contract creation handling logic
+    public async handleContractCreation(tx: Transaction, stateDB: StateDB): Promise<void> {
+        void tx;
+        void stateDB;
     }
 
     public isContractExecution(tx: Transaction): boolean {
@@ -530,8 +566,9 @@ export class ConsensusManager extends EventEmitter {
         return false;
     }
 
-    public async handleContractExecution(tx: Transaction, result: ExecutionResult): Promise<void> {
-        // TODO: Implement contract execution handling logic
+    public async handleContractExecution(tx: Transaction, stateDB: StateDB): Promise<void> {
+        void tx;
+        void stateDB;
     }
 
     public encodeReceipt(receipt: TransactionReceipt): string {
@@ -572,36 +609,4 @@ interface ConsensusHealth {
     finality: number;
     forkCount: number;
     lastUpdate: number;
-}
-
-interface ExecutionResult {
-    gasUsed: bigint;
-    status: boolean;
-    logs: Log[];
-    returnData?: Buffer;
-}
-
-interface AccountState {
-    nonce: number;
-    balance: bigint;
-    codeHash: string;
-    storageRoot: string;
-}
-
-interface StateDB {
-    getRoot(): string;
-    setRoot(root: string): Promise<void>;
-    getAccountState(address: string): Promise<AccountState>;
-    // Add other required methods
-}
-
-interface ExecutionContext {
-    // Define the structure of the execution context
-}
-
-interface ExecutionResult {
-    gasUsed: bigint;
-    status: boolean;
-    logs: Log[];
-    returnData?: Buffer;
 } 

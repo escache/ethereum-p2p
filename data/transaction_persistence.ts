@@ -1,7 +1,7 @@
 // Transaction Persistence Implementation
 import { EventEmitter } from 'events';
 import { writeFile, readFile } from 'fs/promises';
-import { Transaction } from './network';
+import { Transaction } from '../network/types';
 import { PoolTransaction } from './transaction_pool';
 
 export class TransactionPersistence extends EventEmitter {

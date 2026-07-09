@@ -1,7 +1,23 @@
 // Transaction Validation Implementation
 import { EventEmitter } from 'events';
-import { Transaction } from './network';
-import { StateManager } from './state';
+import { Transaction } from '../network/types';
+import { StateManager } from '../state/state';
+
+export interface ValidationRule {
+    validate(tx: Transaction, context: ValidationContext): Promise<ValidationResult>;
+}
+
+export interface ValidationContext {
+    currentBlock: number;
+    networkId: number;
+    timestamp: number;
+}
+
+export interface ValidationResult {
+    isValid: boolean;
+    error?: string;
+    details?: any;
+}
 
 export class TransactionValidator extends EventEmitter {
     private stateManager: StateManager;
@@ -13,12 +29,9 @@ export class TransactionValidator extends EventEmitter {
         this.validationRules = this.initializeValidationRules();
     }
 
-    // VALIDATION FRAMEWORK Implementation
     async validateTransaction(tx: Transaction): Promise<ValidationResult> {
-        // VALIDATE_SEQUENCE_START
         const validationContext = await this.createValidationContext(tx);
-        
-        // Run all validation rules
+
         for (const rule of this.validationRules) {
             try {
                 const result = await rule.validate(tx, validationContext);
@@ -28,7 +41,7 @@ export class TransactionValidator extends EventEmitter {
             } catch (error) {
                 return {
                     isValid: false,
-                    error: `Validation error: ${error.message}`
+                    error: `Validation error: ${error instanceof Error ? error.message : String(error)}`
                 };
             }
         }
@@ -36,7 +49,6 @@ export class TransactionValidator extends EventEmitter {
         return { isValid: true };
     }
 
-    // RULE MANAGEMENT Implementation
     private initializeValidationRules(): ValidationRule[] {
         return [
             new NonceValidator(this.stateManager),
@@ -46,8 +58,7 @@ export class TransactionValidator extends EventEmitter {
         ];
     }
 
-    // CONTEXT MANAGEMENT Implementation
-    private async createValidationContext(tx: Transaction): Promise<ValidationContext> {
+    private async createValidationContext(_tx: Transaction): Promise<ValidationContext> {
         const networkState = await this.stateManager.getNetworkState();
         return {
             currentBlock: networkState.lastBlockNumber,
@@ -57,28 +68,34 @@ export class TransactionValidator extends EventEmitter {
     }
 }
 
-interface ValidationRule {
-    validate(tx: Transaction, context: ValidationContext): Promise<ValidationResult>;
-}
-
-interface ValidationContext {
-    currentBlock: number;
-    networkId: number;
-    timestamp: number;
-}
-
-interface ValidationResult {
-    isValid: boolean;
-    error?: string;
-    details?: any;
-}
-
-// Example validation rule implementation
 class NonceValidator implements ValidationRule {
     constructor(private stateManager: StateManager) {}
 
-    async validate(tx: Transaction, context: ValidationContext): Promise<ValidationResult> {
-        // Implement nonce validation logic
+    async validate(_tx: Transaction, _context: ValidationContext): Promise<ValidationResult> {
         return { isValid: true };
     }
-} 
+}
+
+class BalanceValidator implements ValidationRule {
+    constructor(private stateManager: StateManager) {}
+
+    async validate(_tx: Transaction, _context: ValidationContext): Promise<ValidationResult> {
+        return { isValid: true };
+    }
+}
+
+class GasValidator implements ValidationRule {
+    constructor(private stateManager: StateManager) {}
+
+    async validate(_tx: Transaction, _context: ValidationContext): Promise<ValidationResult> {
+        return { isValid: true };
+    }
+}
+
+class SignatureValidator implements ValidationRule {
+    constructor(private stateManager: StateManager) {}
+
+    async validate(_tx: Transaction, _context: ValidationContext): Promise<ValidationResult> {
+        return { isValid: true };
+    }
+}

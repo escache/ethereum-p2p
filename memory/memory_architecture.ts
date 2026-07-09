@@ -1,6 +1,12 @@
 // Memory Architecture Implementation
 import { EventEmitter } from 'events';
 
+class BufferOperations {
+    allocate(size: number): Buffer {
+        return Buffer.alloc(size);
+    }
+}
+
 export class MemoryArchitecture extends EventEmitter {
     private primaryBuffers: Map<string, Buffer>;
     private secondaryBuffers: Map<string, Buffer>;
@@ -8,19 +14,13 @@ export class MemoryArchitecture extends EventEmitter {
 
     constructor() {
         super();
+        this.primaryBuffers = new Map();
+        this.secondaryBuffers = new Map();
+        this.bufferOperations = new BufferOperations();
         this.initializeMemory();
     }
 
     private async initializeMemory(): Promise<void> {
-        // BUFFER_VERIFY_SEQUENCE
-        this.primaryBuffers = new Map();
-        
-        // BUFFER_JOIN_WAIT_KEY
-        this.secondaryBuffers = new Map();
-        
-        // BUFFER_ACCESS_U6W
-        this.bufferOperations = new BufferOperations();
+        this.emit('memory:initialized');
     }
-
-    // Implement other memory architecture components...
-} 
+}

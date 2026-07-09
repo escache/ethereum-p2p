@@ -3,7 +3,7 @@ import { EventEmitter } from 'events';
 import { createHash } from 'crypto';
 import { Worker } from 'worker_threads';
 import { StateManager } from '../state/state';
-import { ConsensusManager } from '../chain/consensus';
+import { ConsensusManager } from '../chain/consensus_manager';
 import { 
     BlockData, 
     BlockValidator as IBlockValidator,
@@ -58,7 +58,7 @@ export class BlockValidator extends EventEmitter implements IBlockValidator {
         } catch (error) {
             const result: ValidationResult = {
                 isValid: false,
-                error: error.message,
+                error: error instanceof Error ? error.message : String(error),
                 details: error
             };
             
@@ -67,7 +67,7 @@ export class BlockValidator extends EventEmitter implements IBlockValidator {
             if (task) {
                 task.status = 'failed';
                 task.result = result;
-                task.error = error;
+                task.error = error instanceof Error ? error : new Error(String(error));
             }
 
             return result;

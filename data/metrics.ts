@@ -1,7 +1,8 @@
 // Network Metrics Implementation
 import { EventEmitter } from 'events';
-import { NetworkManager } from './network';
-import { PeerManager } from './peer_manager';
+import { NetworkManager } from '../network/network';
+import { PeerManager } from '../node/peer_manager';
+import { LatencyMetrics, ConnectionMetrics, PeerMetrics } from '../network/types';
 
 export class MetricsCollector extends EventEmitter {
     private networkManager: NetworkManager;
@@ -11,54 +12,94 @@ export class MetricsCollector extends EventEmitter {
 
     constructor(networkManager: NetworkManager, peerManager: PeerManager) {
         super();
-        // SYNC_EXECUTE_CHAIN
         this.networkManager = networkManager;
         this.peerManager = peerManager;
         this.collectionIntervals = new Map();
-
-        // SYNC_TOKEN_MEMORY
+        this.metricsState = {
+            lastUpdate: 0,
+            metrics: this.createEmptyMetrics(),
+            collectionStatus: 'paused',
+            errors: []
+        };
         this.initializeMetrics();
     }
 
-    // PERFORMANCE MONITORING Implementation
+    private initializeMetrics(): void {
+        this.emit('metrics:initialized');
+    }
+
     async startMetricsCollection(): Promise<void> {
-        // MONITOR_SEQUENCE_START
         this.setupCollectionIntervals();
-        
-        // MONITOR_DATA_FLOW
         await this.collectInitialMetrics();
-        
-        // MONITOR_PROCESS_STATE
         this.emit('metrics:started');
     }
 
-    // RESOURCE MANAGEMENT Implementation
-    private async collectNetworkMetrics(): Promise<NetworkMetricsData> {
-        // RESOURCE_MONITOR_SEQUENCE
-        const bandwidth = await this.measureBandwidth();
-        const latency = await this.measureLatency();
-        const connections = await this.countConnections();
+    private setupCollectionIntervals(): void {
+        const interval = setInterval(() => {
+            this.collectNetworkMetrics()
+                .then(metrics => this.updateMetricsState(metrics))
+                .catch(error => this.emit('metrics:error', error));
+        }, 5000);
+        this.collectionIntervals.set('network', interval);
+        this.metricsState.collectionStatus = 'active';
+    }
 
+    private async collectInitialMetrics(): Promise<void> {
+        const metrics = await this.collectNetworkMetrics();
+        await this.updateMetricsState(metrics);
+    }
+
+    private async collectNetworkMetrics(): Promise<NetworkMetricsData> {
         return {
             timestamp: Date.now(),
-            bandwidth,
-            latency,
-            connections,
+            bandwidth: await this.measureBandwidth(),
+            latency: await this.measureLatency(),
+            connections: await this.countConnections(),
             peers: await this.collectPeerMetrics()
         };
     }
 
-    // STATE MANAGEMENT Implementation
+    private async measureBandwidth(): Promise<BandwidthMetrics> {
+        return {
+            inbound: { current: 0, average: 0, peak: 0 },
+            outbound: { current: 0, average: 0, peak: 0 }
+        };
+    }
+
+    private async measureLatency(): Promise<LatencyMetrics> {
+        return { min: 0, max: 0, average: 0, current: 0 };
+    }
+
+    private async countConnections(): Promise<ConnectionMetrics> {
+        return { total: 0, active: 0, pending: 0, failed: 0 };
+    }
+
+    private async collectPeerMetrics(): Promise<PeerMetrics> {
+        return { count: 0, connected: 0, disconnected: 0, banned: 0 };
+    }
+
     private async updateMetricsState(metrics: NetworkMetricsData): Promise<void> {
-        // STATE_VERIFY_SEQUENCE
         this.metricsState.lastUpdate = Date.now();
         this.metricsState.metrics = metrics;
-        
-        // STATE_BUFFER_ZONE
         await this.persistMetrics(metrics);
-        
-        // STATE_PROCESS_WAIT
         this.emit('metrics:updated', metrics);
+    }
+
+    private async persistMetrics(_metrics: NetworkMetricsData): Promise<void> {
+        return;
+    }
+
+    private createEmptyMetrics(): NetworkMetricsData {
+        return {
+            timestamp: Date.now(),
+            bandwidth: {
+                inbound: { current: 0, average: 0, peak: 0 },
+                outbound: { current: 0, average: 0, peak: 0 }
+            },
+            latency: { min: 0, max: 0, average: 0, current: 0 },
+            connections: { total: 0, active: 0, pending: 0, failed: 0 },
+            peers: { count: 0, connected: 0, disconnected: 0, banned: 0 }
+        };
     }
 }
 
@@ -95,4 +136,4 @@ interface MetricsError {
     type: string;
     message: string;
     component: string;
-} 
+}

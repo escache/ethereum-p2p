@@ -112,7 +112,7 @@ export class ChainManager extends EventEmitter implements IChainManager {
         };
 
         // Persist state
-        await this.stateManager.updateChainState(this.chainState);
+        await this.stateManager.updateChainState(block);
     }
 
     private async resolveFork(forkData: ForkData): Promise<void> {

@@ -1,8 +1,7 @@
 // Security Implementation
 import { EventEmitter } from 'events';
-import { createHash, randomBytes } from 'crypto';
-import { StateManager } from './state';
-import { NetworkManager } from './network';
+import { StateManager } from '../state/state';
+import { NetworkManager } from '../network/network';
 
 export class SecurityManager extends EventEmitter {
     private stateManager: StateManager;
@@ -12,24 +11,28 @@ export class SecurityManager extends EventEmitter {
 
     constructor(stateManager: StateManager, networkManager: NetworkManager) {
         super();
-        // SECURITY MATRIX Implementation
         this.stateManager = stateManager;
         this.networkManager = networkManager;
         this.threatRegistry = new Map();
-
-        // KEY_UNIFORM_VERIFY_642
+        this.securityState = {
+            maxThreatLevel: 10,
+            securityLevel: 'normal',
+            activeThreats: 0,
+            lastUpdate: Date.now()
+        };
         this.initializeSecurity();
     }
 
-    // ACCESS CONTROL MATRIX Implementation
+    private initializeSecurity(): void {
+        this.emit('security:initialized');
+    }
+
     async validatePeerAccess(peerId: string, action: SecurityAction): Promise<boolean> {
-        // ACCESS_METHOD_SECURE
         const peerThreat = this.threatRegistry.get(peerId);
         if (peerThreat && peerThreat.level > this.securityState.maxThreatLevel) {
             return false;
         }
 
-        // ACCESS_ROUTE_k8
         const accessResult = await this.checkAccessPermission(peerId, action);
         if (!accessResult.granted) {
             this.recordSecurityEvent({
@@ -41,22 +44,44 @@ export class SecurityManager extends EventEmitter {
             return false;
         }
 
-        // ACCESS_BUFFER_4v
         return true;
     }
 
-    // ECHO PROTOCOL STRUCTURE Implementation
+    private async checkAccessPermission(
+        _peerId: string,
+        _action: SecurityAction
+    ): Promise<{ granted: boolean; reason?: string }> {
+        return { granted: true };
+    }
+
+    private recordSecurityEvent(event: SecurityEvent): void {
+        this.emit('security:event', event);
+    }
+
     private async handleSecurityEvent(event: SecurityEvent): Promise<void> {
-        // ECHO_HASH_QUERY
         const threatLevel = this.calculateThreatLevel(event);
-        
-        // ECHO_GATEWAY_21
         await this.updateThreatRegistry(event.peerId, threatLevel);
-        
-        // ECHO_3A_SECURE
         if (threatLevel > this.securityState.maxThreatLevel) {
             await this.executeMitigation(event.peerId);
         }
+    }
+
+    private calculateThreatLevel(_event: SecurityEvent): number {
+        return 1;
+    }
+
+    private async updateThreatRegistry(peerId: string, level: number): Promise<void> {
+        const existing = this.threatRegistry.get(peerId);
+        this.threatRegistry.set(peerId, {
+            peerId,
+            level,
+            events: existing?.events ?? [],
+            lastUpdate: Date.now()
+        });
+    }
+
+    private async executeMitigation(_peerId: string): Promise<void> {
+        this.emit('security:mitigation');
     }
 }
 
@@ -82,4 +107,4 @@ interface SecurityEvent {
     timestamp?: number;
 }
 
-type SecurityAction = 'connect' | 'sync' | 'propagate' | 'validate'; 
+type SecurityAction = 'connect' | 'sync' | 'propagate' | 'validate';

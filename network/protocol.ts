@@ -69,8 +69,8 @@ export enum MessageType {
 
 // Message Handlers
 export abstract class BaseMessageHandler {
-    protected abstract async verifyMessage(message: Buffer): Promise<boolean>;
-    protected abstract async processMessage(message: Buffer): Promise<void>;
+    protected abstract verifyMessage(message: Buffer): Promise<boolean>;
+    protected abstract processMessage(message: Buffer): Promise<void>;
 }
 
 // Protocol Message Handlers
@@ -140,7 +140,8 @@ export class EthereumP2PNode extends EventEmitter {
         
         this.initializeSecurity();
         this.initializeNetwork().catch(error => {
-            this.emit('error', new ConnectionError(`Network initialization failed: ${error.message}`));
+            const message = error instanceof Error ? error.message : String(error);
+            this.emit('error', new ConnectionError(`Network initialization failed: ${message}`));
         });
     }
 
@@ -171,7 +172,7 @@ export class EthereumP2PNode extends EventEmitter {
             this.setupEncryption(nodeKey);
             this.setupHashFunctions();
         } catch (error) {
-            throw new P2PError(`Security initialization failed: ${error.message}`);
+            throw new P2PError(`Security initialization failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
@@ -185,7 +186,7 @@ export class EthereumP2PNode extends EventEmitter {
             this.initializeBufferZone(messageBuffer);
             this.setupTransferBuffers();
         } catch (error) {
-            throw new P2PError(`Buffer control setup failed: ${error.message}`);
+            throw new P2PError(`Buffer control setup failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
@@ -206,13 +207,13 @@ export class EthereumP2PNode extends EventEmitter {
                 });
 
                 server.on('error', (error) => {
-                    reject(new ConnectionError(`Server initialization failed: ${error.message}`));
+                    reject(new ConnectionError(`Server initialization failed: ${error instanceof Error ? error.message : String(error)}`));
                 });
             });
 
             await this.connectToBootstrapNodes();
         } catch (error) {
-            throw new ConnectionError(`Network initialization failed: ${error.message}`);
+            throw new ConnectionError(`Network initialization failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
@@ -258,7 +259,7 @@ export class EthereumP2PNode extends EventEmitter {
             try {
                 // Implementation details for bootstrap connection
             } catch (error) {
-                this.emit('error', `Failed to connect to bootstrap node: ${error.message}`);
+                this.emit('error', `Failed to connect to bootstrap node: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
     }
@@ -335,7 +336,7 @@ export class Peer extends EventEmitter {
         this.lastSeen = Date.now();
         this.handshakeTimeout = 5000; // 5 seconds
         this.initializeProtocols().catch(error => {
-            this.emit('error', new ConnectionError(`Protocol initialization failed: ${error.message}`));
+            this.emit('error', new ConnectionError(`Protocol initialization failed: ${error instanceof Error ? error.message : String(error)}`));
         });
     }
 
@@ -351,7 +352,7 @@ export class Peer extends EventEmitter {
             this.status = PeerStatus.CONNECTED;
         } catch (error) {
             this.status = PeerStatus.DISCONNECTED;
-            throw new ConnectionError(`Protocol initialization failed: ${error.message}`);
+            throw new ConnectionError(`Protocol initialization failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
@@ -369,7 +370,7 @@ export class Peer extends EventEmitter {
                 throw new ConnectionError('Handshake response verification failed');
             }
         } catch (error) {
-            throw new ConnectionError(`Handshake failed: ${error.message}`);
+            throw new ConnectionError(`Handshake failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
@@ -408,7 +409,7 @@ export class Peer extends EventEmitter {
         return new Promise((resolve, reject) => {
             this.socket.write(handshakeData, (error) => {
                 if (error) {
-                    reject(new ConnectionError(`Failed to send handshake: ${error.message}`));
+                    reject(new ConnectionError(`Failed to send handshake: ${error instanceof Error ? error.message : String(error)}`));
                 } else {
                     resolve();
                 }
@@ -458,7 +459,7 @@ export class Peer extends EventEmitter {
         return new Promise((resolve, reject) => {
             this.socket.write(challenge, (error) => {
                 if (error) {
-                    reject(new ConnectionError(`Failed to send challenge: ${error.message}`));
+                    reject(new ConnectionError(`Failed to send challenge: ${error instanceof Error ? error.message : String(error)}`));
                 } else {
                     resolve();
                 }
@@ -518,7 +519,8 @@ export class Peer extends EventEmitter {
             try {
                 await MessageHandler.handleMessage(data);
             } catch (error) {
-                this.emit('error', new MessageError(`Message handling failed: ${error.message}`));
+                const message = error instanceof Error ? error.message : String(error);
+                this.emit('error', new MessageError(`Message handling failed: ${message}`));
             }
         });
     }
@@ -540,12 +542,3 @@ interface P2PConfig {
     minPeers?: number;
     peerTimeout?: number;
 }
-
-export {
-    EthereumP2PNode,
-    Peer,
-    MessageHandler,
-    SecurityManager,
-    P2PConfig,
-    PeerStatus
-}; 

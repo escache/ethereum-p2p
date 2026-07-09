@@ -1,7 +1,7 @@
 // Network exports
 export * from './network/messages';
 export * from './network/handlers';
-export * from './network/network';
+export { NetworkManager, Peer, NetworkBlockData, NetworkBlockHeader } from './network/network';
 export * from './network/network_protocol';
 export * from './network/network_optimizer';
 export * from './network/protocol_types';
@@ -10,10 +10,9 @@ export * from './network/types';
 // Chain exports
 export * from './chain/block_finalizer';
 export * from './chain/block_propagation';
-export * from './chain/block_storage';
-export * from './chain/chain_manager';
-export * from './chain/consensus_manager';
-export * from './chain/consensus';
+export { BlockStorage } from './chain/block_storage';
+export { ChainManager } from './chain/chain_manager';
+export { ConsensusManager } from './chain/consensus_manager';
 
 // Data exports
 export * from './data/metrics';
@@ -33,7 +32,7 @@ export * from './node/peer_manager';
 // Security exports
 export * from './security/encryption';
 export * from './security/security_matrix';
-export * from './security/security';
+export { SecurityManager as NetworkSecurityManager } from './security/security';
 
 // State exports
 export * from './state/state';
@@ -43,6 +42,6 @@ export * from './sync/finality_tracker';
 export * from './sync/sync';
 
 // Verification exports
-export * from './verification/block_validator';
-export * from './verification/transaction_validator';
-export * from './verification/validation_rules'; 
+export { BlockValidator } from './verification/block_validator';
+export { TransactionValidator } from './verification/transaction_validator';
+export { NonceValidator, BalanceValidator, GasValidator, SignatureValidator } from './verification/validation_rules';

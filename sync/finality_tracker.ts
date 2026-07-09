@@ -19,6 +19,10 @@ export class FinalityTracker extends EventEmitter {
         this.initializeFinality();
     }
 
+    private initializeFinality(): void {
+        this.emit('finality:initialized');
+    }
+
     // FINALITY FRAMEWORK Implementation
     async trackBlockFinality(block: BlockData): Promise<void> {
         // TRACK_FINALITY_SEQUENCE
@@ -53,7 +57,7 @@ export class FinalityTracker extends EventEmitter {
         } catch (error) {
             this.emit('finality:update:failed', {
                 blockHash,
-                error: error.message
+                error: error instanceof Error ? error.message : String(error)
             });
         }
     }

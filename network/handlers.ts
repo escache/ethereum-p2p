@@ -119,7 +119,7 @@ export class MessageHandlers {
 
     private async sendPongResponse(peerId: string): Promise<void> {
         const pongMessage = this.createPongMessage();
-        await this.stateManager.sendMessage(peerId, MessageType.PONG, pongMessage);
+        await this.stateManager.sendMessage(peerId, pongMessage);
     }
 
     private createPongMessage(): Buffer {

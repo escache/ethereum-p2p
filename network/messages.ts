@@ -81,7 +81,7 @@ export class ProtocolMessage {
 
         // Decompress if needed
         if (flags & MessageFlags.COMPRESSED) {
-            payload = await this.decompressPayload(payload);
+            payload = Buffer.from(await this.decompressPayload(payload));
         }
 
         // Verify checksum

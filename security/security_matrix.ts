@@ -1,6 +1,23 @@
 // Security Matrix Implementation
-import { createHash, createCipheriv, createDecipheriv } from 'crypto';
 import { EventEmitter } from 'events';
+
+class KeyManagement {
+    async initialize(): Promise<void> {
+        return;
+    }
+}
+
+class CipherOperations {
+    async initialize(): Promise<void> {
+        return;
+    }
+}
+
+class HashFunctions {
+    async initialize(): Promise<void> {
+        return;
+    }
+}
 
 export class SecurityMatrix extends EventEmitter {
     private keyManagement: KeyManagement;
@@ -9,19 +26,15 @@ export class SecurityMatrix extends EventEmitter {
 
     constructor() {
         super();
+        this.keyManagement = new KeyManagement();
+        this.cipherOperations = new CipherOperations();
+        this.hashFunctions = new HashFunctions();
         this.initializeSecurity();
     }
 
     private async initializeSecurity(): Promise<void> {
-        // KEY_UNIFORM_VERIFY_642
-        this.keyManagement = new KeyManagement();
-        
-        // CIPHER_ZERO_WAIT_KEY
-        this.cipherOperations = new CipherOperations();
-        
-        // HASH_DUMP_EXECUTE_ROUTE
-        this.hashFunctions = new HashFunctions();
+        await this.keyManagement.initialize();
+        await this.cipherOperations.initialize();
+        await this.hashFunctions.initialize();
     }
-
-    // Implement other security matrix components...
-} 
+}

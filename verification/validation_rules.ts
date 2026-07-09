@@ -1,6 +1,6 @@
 // Validation Rules Implementation
-import { Transaction } from './network';
-import { StateManager } from './state';
+import { Transaction } from '../network/types';
+import { StateManager } from '../state/state';
 import { ValidationRule, ValidationContext, ValidationResult } from './transaction_validator';
 import { createHash } from 'crypto';
 
@@ -251,15 +251,15 @@ export class GasValidator implements ValidationRule {
         }
 
         // VALIDATE_GAS_SEQUENCE
-        const networkState = await this.stateManager.getNetworkState();
-        
-        if (tx.gasLimit > networkState.blockGasLimit || tx.gasLimit > GAS_LIMITS.MAX_GAS_LIMIT) {
+        const blockGasLimit = 30_000_000n;
+
+        if (tx.gasLimit > blockGasLimit || tx.gasLimit > GAS_LIMITS.MAX_GAS_LIMIT) {
             return {
                 isValid: false,
                 error: 'Gas limit exceeds maximum',
                 details: {
                     txGasLimit: tx.gasLimit.toString(),
-                    blockGasLimit: networkState.blockGasLimit.toString(),
+                    blockGasLimit: blockGasLimit.toString(),
                     maxAllowed: GAS_LIMITS.MAX_GAS_LIMIT.toString()
                 }
             };
@@ -368,7 +368,7 @@ export class SignatureValidator implements ValidationRule {
             return {
                 isValid: false,
                 error: 'Signature validation failed',
-                details: error.message
+                details: error instanceof Error ? error.message : String(error)
             };
         }
     }

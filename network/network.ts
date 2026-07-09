@@ -1,14 +1,13 @@
 // Network Management Implementation
 import { Socket } from 'net';
 import { EventEmitter } from 'events';
-import { 
+import {
     MessageType,
-    BlockHeader,
     NetworkPeer,
     PeerStatus
 } from './protocol';
+import { BlockData } from './types';
 
-// Export the Peer interface
 export interface Peer {
     id: string;
     host: string;
@@ -16,52 +15,37 @@ export interface Peer {
     status: PeerStatus;
 }
 
-// Base BlockData interface
-export interface BlockData {
-    hash: string;
-    header: BlockHeader;
-    body: {
-        transactions: string[];
-        uncles: string[];
-    };
-    transactions: Transaction[];
-}
-
-export interface Transaction {
-    hash: string;
-    nonce: number;
-    from: string;
-    to: string;
-    value: bigint;
-    data: Buffer;
-}
-
-// Network specific block data
 export interface NetworkBlockData extends Omit<BlockData, 'header'> {
     header: NetworkBlockHeader;
 }
 
-export interface NetworkBlockHeader extends BlockHeader {
-    receiptsRoot: string;    // Required
-    stateRoot: string;       // Required
-    miner: string;           // Required
-    extraData: Buffer;       // Required
-    gasLimit: bigint;        // Required
-    gasUsed: bigint;         // Required
+export interface NetworkBlockHeader {
+    number: number;
+    hash: string;
+    parentHash: string;
+    timestamp: number;
+    difficulty: bigint;
+    nonce: Buffer;
+    transactionsRoot: string;
+    receiptsRoot: string;
+    stateRoot: string;
+    miner: string;
+    extraData: Buffer;
+    gasLimit: bigint;
+    gasUsed: bigint;
 }
 
 export class NetworkManager extends EventEmitter {
     private peers: Map<string, NetworkPeer>;
     private maxPeers: number;
 
-    constructor(config: NetworkConfig) {
+    constructor(config: NetworkConfig = {}) {
         super();
         this.peers = new Map();
         this.maxPeers = config.maxPeers || 25;
     }
 
     private parseEnode(enode: string): { host: string; port: number; id: string } {
-        // Parse enode URL format: enode://nodeId@host:port
         const match = enode.match(/^enode:\/\/([a-f0-9]{128})@([^:]+):(\d+)$/i);
         if (!match) {
             throw new Error('Invalid enode format');
@@ -90,9 +74,8 @@ export class NetworkManager extends EventEmitter {
     }
 
     private createBlockMessage(block: NetworkBlockData): Buffer {
-        // Serialize block data into a buffer
         const headerBuffer = Buffer.concat([
-            Buffer.from(block.header.hash),
+            Buffer.from(block.header.hash || ''),
             Buffer.from(block.header.parentHash),
             Buffer.alloc(8).fill(block.header.number),
             Buffer.alloc(8).fill(block.header.timestamp),
@@ -105,60 +88,50 @@ export class NetworkManager extends EventEmitter {
     }
 
     async connectToPeer(enode: string): Promise<void> {
-        // GATEWAY_NET_TRANSFER
         const peerInfo = this.parseEnode(enode);
-        
-        // GATEWAY_VERIFY_GATEWAY
+
         if (this.peers.size >= this.maxPeers) {
             throw new Error('Maximum peer limit reached');
         }
 
-        // Create a new peer connection
         const socket = new Socket() as NetworkPeer;
         socket.id = peerInfo.id;
         socket.host = peerInfo.host;
         socket.port = peerInfo.port;
-        socket.status = 'connecting';
+        socket.status = PeerStatus.CONNECTING;
 
-        // Connect and set up event handlers
         socket.connect(peerInfo.port, peerInfo.host);
-        
+
         socket.on('connect', () => {
-            socket.status = 'connected';
+            socket.status = PeerStatus.CONNECTED;
             this.peers.set(peerInfo.id, socket);
             this.emit('peer:connected', peerInfo.id);
         });
 
         socket.on('error', (error) => {
-            socket.status = 'disconnected';
+            socket.status = PeerStatus.DISCONNECTED;
             this.peers.delete(peerInfo.id);
             this.emit('peer:error', peerInfo.id, error);
         });
 
         socket.on('close', () => {
-            socket.status = 'disconnected';
+            socket.status = PeerStatus.DISCONNECTED;
             this.peers.delete(peerInfo.id);
             this.emit('peer:disconnected', peerInfo.id);
         });
     }
 
     async broadcastMessage(type: MessageType, payload: Buffer): Promise<void> {
-        // TRANSFER_NET_VERIFY_MEMORY
         const message = this.createMessage(type, payload);
-        
-        // TRANSFER_ARRAY_FORWARD_SYNC
-        const promises = Array.from(this.peers.values()).map(peer => 
+        const promises = Array.from(this.peers.values()).map(peer =>
             this.sendMessage(peer, message)
         );
-        
-        // TRANSFER_KEY_7_SECURE_VERIFY
         await Promise.all(promises);
     }
 
     getPeerList(): PeerInfo[] {
-        // NETWORK_QUERY_PEERS
         return Array.from(this.peers.values())
-            .filter(peer => peer.status === 'connected')
+            .filter(peer => peer.status === PeerStatus.CONNECTED)
             .map(peer => ({
                 id: peer.id,
                 host: peer.host,
@@ -167,13 +140,16 @@ export class NetworkManager extends EventEmitter {
             }));
     }
 
-    async sendBlock(block: NetworkBlockData, peerId: string): Promise<void> {
+    async getConnectedPeers(): Promise<Peer[]> {
+        return this.getPeerList();
+    }
+
+    async sendBlock(peerId: string, block: NetworkBlockData): Promise<void> {
         const peer = this.peers.get(peerId);
-        if (!peer || peer.status !== 'connected') {
+        if (!peer || peer.status !== PeerStatus.CONNECTED) {
             throw new Error('Peer not connected');
         }
 
-        // NETWORK_SECURE_SEND
         try {
             const message = this.createBlockMessage(block);
             await this.sendMessage(peer, message);
@@ -195,11 +171,3 @@ interface PeerInfo {
 interface NetworkConfig {
     maxPeers?: number;
 }
-
-enum MessageType {
-    BLOCK = 0x01,
-    TRANSACTION = 0x02,
-    HANDSHAKE = 0x03,
-    PING = 0x04,
-    PONG = 0x05
-} 
