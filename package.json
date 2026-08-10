@@ -1,7 +1,7 @@
 {
-  "name": "nexeth",
+  "name": "agent-communication-adapters",
   "version": "1.0.0",
-  "description": "A TypeScript implementation of an Ethereum P2P network protocol",
+  "description": "TypeScript agent communication adapter framework for multi-agent interoperability",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
