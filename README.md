@@ -1,172 +1,85 @@
-# Nexeth P2P Network Implementation
+# Agent Communication Adapters
 
-A TypeScript implementation of an Ethereum P2P network protocol with advanced networking, consensus, and state management capabilities.
+A TypeScript framework that implements adapter-style communication for multi-agent systems. It decouples agent logic from transport, serialization, and protocol concerns while enabling interoperability between heterogeneous agents.
 
 ## Project Structure
 
-The project is organized into the following main components:
-
 ```
-nexeth/
-├── access/           # Access control and permissions
-├── chain/            # Chain management and consensus
-│   ├── block_finalizer.ts
-│   ├── block_propagation.ts
-│   ├── block_storage.ts
-│   ├── chain_manager.ts
-│   ├── consensus_manager.ts
-│   └── consensus.ts
-├── data/            # Transaction handling and metrics
-│   ├── metrics.ts
-│   ├── transaction_executor.ts
-│   ├── transaction_persistence.ts
-│   ├── transaction_pool.ts
-│   └── transactions.ts
-├── memory/          # Memory management and mempool
-│   ├── memory_architecture.ts
-│   └── mempool.ts
-├── network/         # Network protocols and message handling
-│   ├── handlers.ts
-│   ├── messages.ts
-│   ├── network_optimizer.ts
-│   ├── network_protocol.ts
-│   ├── network.ts
-│   ├── protocol.ts
-│   ├── protocol_types.ts
-│   └── types.ts
-├── node/           # Peer discovery and management
-│   ├── discovery.ts
-│   └── peer_manager.ts
-├── security/       # Security and encryption
-│   ├── encryption.ts
-│   ├── security_matrix.ts
-│   └── security.ts
-├── state/          # State management
-│   └── state.ts
-├── sync/           # Synchronization and finality
-│   ├── finality_tracker.ts
-│   └── sync.ts
-└── verification/   # Block and transaction validation
-    ├── block_validator.ts
-    ├── transaction_validator.ts
-    └── validation_rules.ts
-
-## Features
-
-- **Advanced P2P Networking**
-  - Efficient message handling with compression support
-  - Robust peer discovery and management
-  - Network optimization and metrics collection
-
-- **Blockchain Management**
-  - Block validation and propagation
-  - Transaction processing and persistence
-  - Chain reorganization handling
-  - Fork detection and resolution
-
-- **Security**
-  - Message encryption and integrity verification
-  - Peer scoring and ban management
-  - Access control matrix
-
-- **State Management**
-  - Efficient state tracking and updates
-  - Finality tracking
-  - Block and transaction validation
-
-- **Memory Management**
-  - Memory-efficient data structures
-  - Transaction mempool management
-  - Caching and optimization
+├── agent/                 # Core adapter framework
+│   ├── types.ts           # Message, AgentIdentifier, Result, BROADCAST
+│   ├── adapters.ts        # Communication, transport, and serialization interfaces
+│   ├── base_adapter.ts    # BaseCommunicationAdapter
+│   ├── json_protocol_adapter.ts   # JSON-based protocol adapter
+│   ├── json_serializer.ts         # JSON serialization adapter
+│   ├── in_memory_transport.ts     # In-memory/queue transport adapter
+│   ├── agent.ts           # Generic agent that uses an adapter
+│   └── index.ts           # Public exports
+├── index.ts               # Library entry point
+├── package.json
+├── tsconfig.json
+├── jest.config.js
+└── .eslintrc.json
+```
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js (v14 or higher)
-- TypeScript (v4.5 or higher)
-- npm or yarn
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/accessor-io/ethereum-p2p.git
-cd nexeth
-```
-
-2. Install dependencies:
 ```bash
 npm install
-```
-
-3. Build the project:
-```bash
 npm run build
+npm run check-types
+npm run lint
+npm test
 ```
 
-### Usage
-
-The project provides a modular architecture that can be integrated into various Ethereum-compatible applications. Here's a basic example:
+## Usage Example
 
 ```typescript
-import { NetworkManager } from './network/network';
-import { StateManager } from './state/state';
-import { PeerManager } from './node/peer_manager';
+import {
+  Agent,
+  AgentIdentifier,
+  InMemoryTransportAdapter,
+  JsonSerializer,
+  JsonProtocolAdapter
+} from './agent';
 
-// Initialize core components
-const stateManager = new StateManager();
-const networkManager = new NetworkManager(stateManager);
-const peerManager = new PeerManager(stateManager, networkManager);
+const transport = new InMemoryTransportAdapter();
+const serializer = new JsonSerializer();
+const adapter = new JsonProtocolAdapter(transport, serializer);
 
-// Start the network
-networkManager.start().then(() => {
-    console.log('Network started successfully');
+const agentA = new Agent({ name: 'AgentA', address: 'addrA', capabilities: new Set() }, adapter);
+const agentB = new Agent({ name: 'AgentB', address: 'addrB', capabilities: new Set() }, adapter);
+
+agentA.initialize({ endpoint: 'addrA' });
+agentB.initialize({ endpoint: 'addrB' });
+
+agentA.sendRequest({ name: 'AgentB', address: 'addrB', capabilities: new Set() }, 'hello');
+
+agentB.processIncoming((msg) => {
+  console.log('AgentB received:', msg);
 });
 ```
 
 ## Architecture
 
-The project follows a modular architecture based on the following frameworks:
+The framework defines layered adapters:
 
-1. **Initialization Framework**
-   - Bootstrap protocol
-   - Primary/Secondary/Tertiary initialization
+- **Protocol adapters** translate domain `Message` objects to and from a serialized wire form.
+- **Transport adapters** move serialized byte payloads between agents.
+- **Serialization adapters** convert in-memory objects to bytes and back.
+- **BaseCommunicationAdapter** composes a transport and serializer and exposes `send`, `receive`, `connect`, `disconnect`, `supports`, and `getStatus`.
+- **Agent** provides a thin wrapper that uses a `CommunicationAdapter` to send requests and process an inbound message queue.
 
-2. **Security Matrix**
-   - Encryption layer
-   - Key management
-   - Hash functions
+## Adapter Types (Future Work)
 
-3. **Memory Architecture**
-   - Buffer control
-   - Memory optimization
-   - Resource management
+The interfaces are intended to be extended with:
 
-4. **Network Protocols**
-   - Message handling
-   - Peer management
-   - Protocol versioning
-
-5. **Process Control Framework**
-   - State management
-   - Event handling
-   - Resource allocation
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- Protocol adapters for FIPA ACL, KQML, gRPC, JSON-RPC, and custom schemas.
+- Transport adapters for HTTP/REST, WebSockets, Kafka, RabbitMQ, Redis, and pub/sub.
+- Serialization adapters for JSON, Protocol Buffers, MessagePack, and domain-specific formats.
+- Security/policy adapters for authentication, authorization, encryption, rate limiting, and content filtering.
+- Observability adapters for logging, tracing, metrics, and audit trails.
+- Bridge and federation adapters for cross-boundary agent systems.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Ethereum P2P Network Protocol
-- TypeScript Community
-- Open Source Contributors 
+MIT
